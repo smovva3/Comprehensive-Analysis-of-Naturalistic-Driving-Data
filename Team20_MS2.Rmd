@@ -1,0 +1,1147 @@
+---
+title: "Project Milestone2"
+author: "Team 20"
+date: "2023-04-21"
+output:
+  pdf_document: default
+  html_document: default
+  word_document: default
+toc: yes
+---
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+library(lmerTest)
+library(sjPlot)
+library(dplyr)
+library(ggplot2)
+library(GGally)
+library(cowplot)
+library(gridExtra)
+library(ggpubr)
+library(reshape2)
+library(igraph)
+library(corrplot)
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+data <- read.csv("/Users/akhilsd/Downloads/MS2 3/Affective_Driving_Dataset_N21.csv")
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+data_susbet <- subset(data, 
+                     select = c(Gender, P_ID, Trip., HR_Raw, Day., Speed, ATP, RTP, Trip_Period, Accel_Energy, Rot_Energy, JF, Weather, Trait_Anxiety, B5A, B5C, B5E, B5N, B5O, State_Anxiety, MD, PD, TD, P, E, `F`, Day_Type))
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+data2 <- data_susbet%>%
+  group_by(P_ID, Trip., Day.)%>%
+  summarise(
+    gen = first(Gender),
+    hr_m = mean(HR_Raw, na.rm = T),
+    day = unique(Day_Type, na.rm = T),
+    s_m = mean(Speed, na.rm = T),
+    w_m = first(Weather),
+    atp_m = mean(ATP, na.rm = T),
+    rtp_m = mean(RTP, na.rm = T),
+    trpr_m = unique(Trip_Period, na.rm = T),
+    ae_m = mean(Accel_Energy, na.rm = T),
+    re_m = mean(Rot_Energy, na.rm = T),
+    jf_m = mean(JF, na.rm = T),
+    ta_m = mean(Trait_Anxiety, na.rm = T),
+    B5A_m = mean(B5A, na.rm = T),
+    B5C_m = mean(B5C, na.rm = T),
+    B5E_m = mean(B5E, na.rm = T),
+    B5N_m = mean(B5N, na.rm = T),
+    B5O_m = mean(B5O, na.rm = T),
+    sa_m = mean(State_Anxiety, na.rm = T),
+    md_m = mean(MD, na.rm = T),
+    pd_m = mean(PD, na.rm = T),
+    td_m = mean(TD, na.rm = T),
+    p_m = mean(P, na.rm = T),
+    e_m = mean(E, na.rm = T),
+    f_m = mean(`F`, na.rm = T),
+    )
+
+```
+\newpage
+
+# Multiple Linear Regression Modeling 
+
+Driving Heart Rate is considered as the response variable in order to perform the Multiple Linear Regression modeling, where we have considered the behavioral, environmental, trait/state psychometric data from which the predictor variables taken into consideration are Speed, ATP, RTP, Accel_Energy, Trip_Period, Rot_Energy, JF, Weather, Trait_Anxiety, B5A, B5C, B5E, B5N, B5O, State_Anxiety, MD, PD, TD, E, F, Gender.
+
+For exploratory data analysis, we can use boxplots to visualize them clearly.
+We already have done the analysis in our Milestone 1.
+
+Below are the steps to be followed to perform the multiple linear regression model & finding the optimal model to estimate what factors are associated with reduction of heart rate during Driving.
+
+
+
+## Cross-correlation matrix to check collinearity
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+data3 <- subset(data2, 
+                     select = c(s_m, atp_m, rtp_m, ae_m, re_m, jf_m, w_m, ta_m, B5A_m, B5C_m, B5E_m, B5N_m, B5O_m, sa_m, md_m, pd_m, td_m, p_m, e_m, f_m))
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+fg<-cor(data3)
+```
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.height=15, fig.width=17}
+ggpairs(data3)
+```
+\newpage
+
+As the no. of variables are more. To make a better visualization of the collinearity between the variables we are making use of a Corr plot. The color index in the Corrplot ranges from -1 to 1.
+
+### Corrplot
+
+```{r echo=FALSE, fig.height=6, fig.width=7, message=FALSE, warning=FALSE}
+corrplot(fg, method = "color", type = "lower")
+```
+
+### Using Corrplot for numeric data
+
+```{r echo=FALSE, fig.height=9, fig.width=15, message=FALSE, warning=FALSE}
+corrplot(cor(data3), method = "number")
+```
+
+
+
+```{r eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+### Network Plot
+corr_network <- graph_from_adjacency_matrix(fg, mode = "upper")
+plot(corr_network, layout = layout_with_fr)
+```
+
+
+***Observations & Conclusions after finding collinearity***
+
+To perform the full model,
+
+  -> We have grouped the dataset using 3 variables: Trip., Day., P_ID.
+  
+  -> Then we calculated the mean of all the above variables from each group using the mean() function and stored it in data2. 
+  
+  -> To eradicate variables that have high correlation we have made use of a Corrplot. 
+  
+  -> The optimal threshold value here is 0.7. From the above plot we can clearly see that only MD and PD falls under this            threshold range. MD and PD come under the category of State Psychometric data. As the two variables are highly
+     correlated we are considering one among them for regression analysis.
+     
+\newpage
+
+## Full Model Evaluation
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+m1 <- lmer(hr_m ~ ( 1 | P_ID) + s_m + atp_m + rtp_m + trpr_m + ae_m + re_m + jf_m + w_m + ta_m + B5A_m + B5C_m + B5E_m + B5N_m + B5O_m + sa_m + pd_m + td_m + p_m + e_m + f_m + gen + day,
+          data = data2, REML = F)
+summary(m1)
+```
+\newpage
+***Observations based on Full Model Results***
+
+We performed the full model by considering the above selected variable as the predictor variable, HR.mean as the response variable, and random effect using ParticipantID. (1 | P_ID)
+
+From the fixed effects section we can see the estimated coefficients for each predictor variable, we can also see that standard errors, p-values & t-values. The estimated value of the intercept term is 42.906883 with a p-value of 0.006663.
+
+It suggests that the intercept is not significantly diff. From zero. Amongst the predictor variables, TripPeriod_morning, Trait_Anxiety, Conscientiousness, Gender_Male, DayType_WeekEnd are significant predictors of the Heart Rate.
+
+While other predictors like (Speed, ATP, RTP) , (Accel_Energy, Rot_Energy, Jam_Factor, Weather, State_Anxiety, Physical Demand, Temporal Demand, Performance, Effort,  Frustration) and other factors (Agreeableness, Extra version, Neuroticism) do not have a significant effect on the Heart Rate.
+
+To determine whether a result is statistically significant or not we make use of 0.05 as the significance level i.e., 
+if (p-value < 0.05)
+
+    -> The null Hypothesis can be rejected and we can make a conclusion that there
+        is a significant effect of the predictor variable on the response variable.
+
+    -> Based on the above results, we can see that many of the predictor 
+       variables have their p-values < 0.05, it indicates that         
+       all those are statistically significant predictors of the 
+       Driving HR.mean at a significance level of 0.05.
+
+Also, we can make a conclusion that these predictors have statistically significant effect on the response variable, The predictors are:
+
+    -> Trip_Period - Morning (p < 0.001)
+    -> Trait_Anxiety ( p = 0.002040)
+    -> Conscientiousness (p = 0.002593)
+    -> genMale ( p = 0.000838)
+    -> dayWeekEnd ( p = 0.037905)
+
+On the other hand, some of the predictors are having their p-value > 0.05. It means that we cannot reject the null hypothesis, and also there is no statistically significant effect of these predictors on the HR.mean() at a significance level of 0.05. Some of the predictors which fall under this category are Speed, ATP, RTP etc.
+
+## AIC 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+m1_aic<- AIC(m1)
+m1_aic
+```
+
+The AIC value of the above model is 1847.952 which suggests that the model is a good fit for the given data. For a given set of data, We know that AIC is a measure of the relative quality of statistical models, where a lower AIC value indicates that the model is a better fit to the data. We should not just make use of the AIC value alone, other factors such as no. of parameters and practical significance of the results also should be taken into consideration during the evaluation of the model.
+
+## Plots
+
+### Predictor Plots using cowplot
+
+```{r,echo=FALSE, warning=FALSE}
+levels = c("A", "B", "C")
+num = c(5, 10, 15)
+ymin = c(0, 0, 0)
+ymax = c(1, 2, 3)
+
+leg_d = data.frame(levels, num, ymin, ymax)
+
+plot <- ggplot(leg_d, aes(x = levels, y = num, colour = levels)) +
+  geom_errorbar(aes(ymin = ymin, ymax = ymax), size = 1.1) +
+  theme_bw() +
+  theme(
+    panel.grid = element_blank(),
+    axis.text.x = element_text(face = "bold", size = 10),
+    legend.position = "bottom",
+    legend.direction = "horizontal",
+    legend.title = element_blank(),
+    legend.key.width = unit(2, 'cm'),
+    legend.text = element_text(size = 20)
+  ) +
+  theme(axis.ticks.y = element_blank(),
+        axis.ticks.x = element_blank()) +
+  scale_color_manual(
+    values = c("deepskyblue3", "orange", "red"),
+    breaks = c("A", "B", "C"),
+    labels = c("     ", "**     ", "***")
+  ) 
+
+mylegend = get_legend(plot)
+```
+
+```{r fig.height=3.5, include=FALSE}
+#Speed
+Speed <- plot_model(m1, 
+             type = "pred", 
+             terms = "s_m",
+             dot.size = 6,
+             line.size = 2,
+             title = " Vehicle Speed")+ 
+        geom_vline(
+          xintercept = mean(data2$s_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+
+```
+
+```{r fig.height=3.5, include=FALSE}
+#ATP
+ATP <- plot_model(m1, 
+             type = "pred", 
+             terms = "atp_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Absolute Throttle")+ 
+        geom_vline(
+          xintercept = mean(data2$atp_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+```
+
+```{r fig.height=3.5, include=FALSE}
+#RTP
+RTP <- plot_model(m1, 
+             type = "pred", 
+             terms = "rtp_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "RTP")+ 
+        geom_vline(
+          xintercept = mean(data2$rtp_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+```
+
+```{r fig.height=3.5, include=FALSE}
+#Trip Period
+Trip_Period<-plot_model(m1, 
+             type = "pred", 
+             terms = "trpr_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Trip Period") +  theme_bw()+
+    aes(color = c("1", "2")) +
+    scale_color_manual( values = c( "gray","red")) +
+      theme(panel.grid = element_blank(),
+        plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(size = 10, face = "bold"),
+        axis.text.y = element_text(size = 10, face = "bold"),
+        legend.position = "none"
+        )+ labs(x="", y="")
+
+```
+
+```{r fig.height=3.5, include=FALSE}
+#Accel_Energy
+Accel_Energy <- plot_model(m1, 
+             type = "pred", 
+             terms = "ae_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Accel Energy")+ 
+        geom_vline(
+          xintercept = mean(data2$ae_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+
+```
+
+```{r fig.height=3.5, include=FALSE}
+#Rot_Energy
+Rot_Energy <- plot_model(m1, 
+             type = "pred", 
+             terms = "re_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Rot Energy")+ 
+        geom_vline(
+          xintercept = mean(data2$re_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+
+```
+
+```{r fig.height=3.5, include=FALSE}
+#JF
+JF <- plot_model(m1, 
+             type = "pred", 
+             terms = "jf_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Jam Factor")+ 
+        geom_vline(
+          xintercept = mean(data2$jf_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+```
+
+```{r fig.height=3.5, include=FALSE}
+#Weather
+Weather <- plot_model(m1, 
+             type = "pred", 
+             terms = "w_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Weather")+ 
+        geom_vline(
+          xintercept = mean(data2$w_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+```
+
+
+```{r echo=FALSE, fig.height=3.5, message=FALSE, include=FALSE}
+#Trait_Anxiety
+Trait_Anxiety <- plot_model(m1, 
+             type = "pred", 
+             terms = "ta_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Trait Anxiety") + 
+        aes(color = "ta_m")+
+        scale_color_manual(values = "orange")+
+        geom_vline(
+          xintercept = mean(data2$ta_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+        
+```
+
+```{r fig.height=3.5, include=FALSE}
+#B5A
+B5A <- plot_model(m1, 
+             type = "pred", 
+             terms = "B5A_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Agreeableness")+ 
+        geom_vline(
+          xintercept = mean(data2$B5A_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+```
+
+```{r fig.height=3.5, include=FALSE}
+#B5C
+B5C <- plot_model(m1, 
+             type = "pred", 
+             terms = "B5C_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Conscientiousness")+ 
+    
+        aes(color = "B5C_m")+
+        scale_color_manual(values = "orange")+
+        geom_vline(
+          xintercept = mean(data2$B5C_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+
+```
+
+```{r fig.height=3.5, include=FALSE}
+#B5E
+B5E <- plot_model(m1, 
+             type = "pred", 
+             terms = "B5E_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "ExtraVersion")+ 
+        geom_vline(
+          xintercept = mean(data2$B5E_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+
+```
+
+```{r fig.height=3.5, include=FALSE}
+#B5N
+B5N <- plot_model(m1, 
+             type = "pred", 
+             terms = "B5N_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Neuroticism")+ 
+        geom_vline(
+          xintercept = mean(data2$B5N_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+
+```
+
+```{r fig.height=3.5, include=FALSE}
+#B5O
+B5O <- plot_model(m1, 
+             type = "pred", 
+             terms = "B5O_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Openness")+ 
+        geom_vline(
+          xintercept = mean(data2$B5O_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+
+```
+
+```{r fig.height=3.5, include=FALSE}
+#State_Anxiety
+State_Anxiety <- plot_model(m1, 
+             type = "pred", 
+             terms = "sa_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "State Anxiety")+ 
+        geom_vline(
+          xintercept = mean(data2$sa_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+
+```
+
+
+```{r fig.height=3.5, include=FALSE}
+#PD
+PD <- plot_model(m1, 
+             type = "pred", 
+             terms = "pd_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Physical Demand")+ 
+        geom_vline(
+          xintercept = mean(data2$pd_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+```
+
+```{r fig.height=3.5, include=FALSE}
+#TD
+TD <- plot_model(m1, 
+             type = "pred", 
+             terms = "td_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Temporal Demand")+ 
+        geom_vline(
+          xintercept = mean(data2$td_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+```
+
+```{r fig.height=3.5, include=FALSE}
+#P
+P <- plot_model(m1, 
+             type = "pred", 
+             terms = "p_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Performance")+ 
+        geom_vline(
+          xintercept = mean(data2$p_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+```
+
+```{r fig.height=3.5, include=FALSE}
+#E
+E <- plot_model(m1, 
+             type = "pred", 
+             terms = "e_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Effort")+ 
+        geom_vline(
+          xintercept = mean(data2$e_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+```
+
+```{r fig.height=3.5, include=FALSE}
+#F
+Frustation <- plot_model(m1, 
+             type = "pred", 
+             terms = "f_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Frustation")+ 
+        geom_vline(
+          xintercept = mean(data2$f_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+```
+
+```{r fig.height=3.5, include=FALSE}
+#Gender
+Gender<-plot_model(m1, 
+             type = "pred", 
+             terms = "gen",
+             dot.size = 6,
+             line.size = 2,
+             title = "Gender") +  theme_bw()+
+    aes(color = c("1", "2")) +
+    scale_color_manual( values = c( "gray","red")) +
+      theme(panel.grid = element_blank(),
+        plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(size = 10, face = "bold"),
+        axis.text.y = element_text(size = 10, face = "bold"),
+        legend.position = "none"
+        )+ labs(x="", y="")
+```
+
+```{r fig.height=3.5, include=FALSE}
+#Day Type
+Day_Type <-plot_model(m1, 
+             type = "pred", 
+             terms = "day",
+             dot.size = 6,
+             line.size = 2,
+             title = "Day Type") +  theme_bw()+
+    aes(color = c("1", "2")) +
+    scale_color_manual( values = c( "gray","deepskyblue3")) +
+      theme(panel.grid = element_blank(),
+        plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(size = 10, face = "bold"),
+        axis.text.y = element_text(size = 10, face = "bold"),
+        legend.position = "none"
+        )+ labs(x="", y="")
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.align='center',fig.height=13, fig.width=10}
+reS1 <- ggarrange(Speed, ATP, RTP, Accel_Energy, Rot_Energy, Gender, Trip_Period, Day_Type, JF, Weather, ncol = 2, nrow = 5)
+                 
+reS_l1 = cowplot::plot_grid(reS1, mylegend, nrow = 2, rel_heights = c(.9,.1))
+reS_l1
+```
+
+\newpage
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.align='center',fig.height=15, fig.width=10}
+reS2 <- ggarrange(Trait_Anxiety, B5A, B5C, B5E, B5N, B5O, State_Anxiety, PD, TD, P, E, Frustation, ncol = 2, nrow = 6)
+
+reS_l2 = cowplot::plot_grid(reS2, mylegend, nrow = 2, rel_heights = c(.9,.1))
+reS_l2
+```
+
+### sjPlot for predictor variables
+
+```{r echo=FALSE, fig.align='center', message=FALSE, warning=FALSE, fig.height=8, fig.width=6}
+sjPlot::plot_model(m1,
+                   show.values=TRUE, show.p=TRUE,
+                   title="Full Model Plot - Predictor Variables") + 
+  theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+          axis.text = element_text(size = 10)
+       ) 
+```
+\newpage
+***OBSERVATIONS: based on the above sjPlot***
+
+By seeing the above Full Model sjPlot, we can make the following observations:
+
+    -> Trip Period - Morning has a negative effect on heart rate (estimate = -4.59).
+    -> Trait Anxiety has a positive effect on heart rate (estimate = 0.66).
+    -> Conscientiousness has a positive effect on heart rate (estimate = 2.68).
+    -> Gender Male has a positive effect on heart rate (estimate = 9.58).
+    -> Day Weekend has a negative effect on heart rate (estimate = -2.67).
+
+The other variables like Speed, ATP, RTP, Accel_Energy, Rot_Energy etc. do not have an affect on the response variable.
+
+Overall, these results suggest that these predictor variables, trip period, trait anxiety, conscientiousness, gender:male, and day:weekend, have a significant impact on heart rate. 
+
+
+### Full model Random effects plot
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.height=8, fig.width=6}
+plot_model(m1, type = "re", title = "Random Effects Plot", show.values = T)+
+   theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+          axis.text = element_text(size = 10)
+       ) 
+```
+
+\newpage
+
+## Backward Elimination
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+m1_bw <- step(m1, direction = "backward")
+m1_bw
+```
+***OBSERVATIONS: based on Backward Elimination results***
+
+Based on the p-values in the backward reduced fixed-effect table, we can make the following observations:
+
+  -> The predictor variables with (p < 0.05) indicated by the asterisks can be considered statistically significant.
+
+  -> The predictor variables Speed, TripPeriod_Morning, Trait_Anxiety, Conscientiousness, Gender, Day_Type are all statistically      significant in predicting the response variable ‘Heart Rate mean’ at the significance level of 0.05.
+
+  -> As the p-value is very high i.e, 0.9360 (Effort) , 0.9277 (Performance) are the first and second predictor variables to be     eliminated from the model.
+
+  ->  The other predictor variables like Jam_Factor, Accel_Energy, Extra version, State_Anxiety, Agreeableness , Temporal Demand, Openness, Frustration, Rot_energy, Weather were next eliminated from the model as they were found to be not statistically significant.
+
+
+Overall, we can come to a conclusion that Speed, TripPeriod_Morning, Trait_Anxiety, Conscientiousness, Gender and Day_Type are significant in predicting the response variable HeartRate mean. The Final model includes a random effect of ‘PID” and fixed effect of Speed, TripPeriod_Morning, Trait_Anxiety, Conscientiousness, Gender and Day_Type
+
+
+The Backward reduced fixed-effect table clearly shows the results of removing each fixed effect from the model. 
+(Note: One at a time)
+For each term:
+
+The table reports sum of squares, deg. of freedom, mean square, F-stat, p value of the respective ANOVA. Predictors with p < 0.05 are considered to be statistically significant.
+
+
+From the table we can clearly see that, 
+Speed, Trip_Period_Mrng, Trait_Anxiety, Conscientiousness, Gender and Day_Type are statistically significant (p < 0.05). While the other terms are not considered to be significant.
+
+
+### Suggested model by BE
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+fm <- get_model(m1_bw)
+sug_fm <- fm@call
+
+m1_sug_bw <- eval(sug_fm)
+m1_sug_bw
+```
+***OBSERVATIONS: based on suggested model by Backward Elimination***
+
+Based on the results of the suggested model with Backward Elimination, we can draw the following conclusions:
+
+  -> We can say that the model fits the data well because the REML criterion at convergence is 1808.7793
+  
+  -> The random_intercepts for each P_Id has a S.d of 3.747, it suggests that there is change in the heart rate between the          individuals that is not explained by the fixed effects in the model.
+  
+  -> The residual S.D is 7.526.
+  
+
+Therefore, the suggested model based on backward elimination is:
+
+hr_m ~ ( 1 | p_ID) + s_m + trpr_m + ta_m + B5C_m + gen + day
+
+
+### AIC by Backward Elimination
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+m1_aic_bw<- AIC(m1_sug_bw)
+m1_aic_bw
+```
+The AIC value of the above model after backward elimination is 1826.779 which suggests that the model is a good fit for the given data. For a given set of data, We know that AIC is a measure of the relative quality of statistical models, where a lower AIC value indicates that the model is a better fit to the data. 
+\newpage
+
+## Forward Elimination 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+m1_fw <- step(m1, direction = "forward")
+m1_fw
+```
+***OBSERVATIONS: based on results after Forward Elimination***
+
+Based on the p-values in the above fixed-effect table we got after forward elimination, we can make the following observations:
+
+  -> The predictor variables with (p < 0.05) indicated by the more no. of asterisks can be considered more statistically             significant i.e., if a predictor variable has *** it is most significant. But, as the no. of asterisks become less the          stastical significance strength simultaneously decreases. Which says that the impact on the response variable is varied.
+
+  -> The predictor variables Speed, TripPeriod_Morning, Trait_Anxiety, Conscientiousness, Gender, Day_Type are all statistically      significant in impacting the response variable ‘Heart Rate’.
+
+
+### Suggested model by FE
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+fm <- get_model(m1_fw)
+sug_fm <- fm@call
+
+m1_sug_fw <- eval(sug_fm)
+m1_sug_fw
+```
+***OBSERVATIONS: based on suggested model by Forward Elimination***
+
+Based on the results of the suggested model with Forward Elimination, we can draw the following conclusions:
+
+  -> We can say that the model fits the data well because the REML criterion at convergence is 1808.7793
+  
+  -> The random_intercepts for each P_ID has a S.D of 3.747.
+  
+  -> The residual S.D is 7.526.
+  
+
+Therefore, the suggested model based on forward elimination is:
+
+hr_m ~ ( 1 | p_ID) + s_m + trpr_m + ta_m + B5C_m + gen + day
+
+The suggested model after backward elimination and forward elimination is the same as per the results.
+
+### AIC by Forward Elimination
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+m1_aic_fw<- AIC(m1_sug_fw)
+m1_aic_fw
+```
+The AIC value of the above model after forward elimination is 1826.779 which suggests that the model is a good fit for the given data. 
+
+\newpage
+## Stepwise Elimination 
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+m1_fb <- step(m1, direction = "both")
+m1_fb
+```
+\newpage
+***OBSERVATIONS: based on Stepwise Elimination***
+
+From the above results we can see that the,
+
+  -> We can see that the results for Backward elimination, forward elimination, and both-direction elimination are the same. 
+
+  -> It suggests that the final model obtained using any of the above approaches is the same. 
+  -> So, we can say that the selected model is strong.
+  -> We can also conclude that the model is not too much dependent on a particular type of elimination process.
+
+### Suggested model by Stepwise
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+fm <- get_model(m1_fb)
+sug_fm <- fm@call
+
+m1_sug_fb <- eval(sug_fm)
+m1_sug_fb
+```
+
+### AIC by Stepwise Elimination
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+m1_aic_fb<- AIC(m1_sug_fb)
+m1_aic_fb
+```
+The AIC value of the above model after stepwise elimination is 1826.779 which suggests that the model is a good fit for the given data. 
+\newpage
+
+# Optimal Model
+## Best fit model suggested by above methods
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+m1_optimal <- lmer(hr_m ~ (1 | P_ID) + s_m + trpr_m + ta_m + B5C_m + gen + day, data = data2, REML = F)
+summary(m1_optimal)
+```
+\newpage
+***OBSERVATIONS: based on Optimal Model***
+
+1) The optimal model is a linearly mixed model.
+
+2) Here, the response variable is Heart Rate, which has a total of six fixed effect which implies that six among 
+   the chosen predictor variables have a statistically significant impact on the Heart Rate while driving.
+  
+3) The optimal model also includes a Random Effect, with an intercept for each individuals ParticipantID.
+
+4) The AIC value is: 1826.8
+   
+From the above results we can draw the following conclusions,
+
+As indicated by the AIC and BIC values the optimal model can be considered as a good fit for our data. The fixed effects are statistically significant(p < 0.05). For the random effect for ParticipantID it indicates that there is variablity between the participants. The correlation range is varying from Moderate to Strong. Based on all these we can say that this optimal model can be a best fit to predict the variablity in Heart Rate based on these six fixed Effects Speed, Trip_Period_Morning, Trait Anxiety, Conscientiousness, Gender_Male, Day_Weekend. Also taking random variablity between Participants into consideration.
+
+## AIC Optimal model
+
+```{r echo=FALSE, message=FALSE, warning=FALSE}
+m1opt_aic<- AIC(m1_optimal)
+m1opt_aic
+```
+The AIC value of the above optimal model is 1826.779 which suggests that the optimal model is a good fit. For a given set of data, We know that AIC is a measure of the relative quality of statistical models, where a lower AIC value indicates that the model is a better fit to the data.
+\newpage
+
+## Plots for Optimal model
+
+### Predictor Plots using cowplot
+
+```{r fig.height=3.5, include=FALSE}
+#Speed
+Speed <- plot_model(m1_optimal, 
+             type = "pred", 
+             terms = "s_m",
+             dot.size = 6,
+             line.size = 2,
+             title = " Vehicle Speed")+ 
+        aes(color = "s_m")+
+        scale_color_manual(values = "deepskyblue3")+
+        geom_vline(
+          xintercept = mean(data2$s_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+
+```
+
+```{r fig.height=3.5, include=FALSE}
+#Trip Period
+Trip_Period<-plot_model(m1_optimal, 
+             type = "pred", 
+             terms = "trpr_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Trip Period") +  theme_bw()+
+    aes(color = c("1", "2")) +
+    scale_color_manual( values = c( "gray","red")) +
+      theme(panel.grid = element_blank(),
+        plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(size = 10, face = "bold"),
+        axis.text.y = element_text(size = 10, face = "bold"),
+        legend.position = "none"
+        )+ labs(x="", y="")
+
+```
+
+```{r fig.height=3.5, include=FALSE}
+#Trait_Anxiety
+Trait_Anxiety <- plot_model(m1_optimal, 
+             type = "pred", 
+             terms = "ta_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Trait Anxiety")+ 
+        aes(color = "ta_m")+
+        scale_color_manual(values = "red")+
+        geom_vline(
+          xintercept = mean(data2$ta_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+
+```
+
+
+```{r fig.height=3.5, include=FALSE}
+#B5C
+B5C <- plot_model(m1_optimal, 
+             type = "pred", 
+             terms = "B5C_m",
+             dot.size = 6,
+             line.size = 2,
+             title = "Conscientiousness")+ 
+         aes(color = "B5C_m")+
+        scale_color_manual(values = "orange")+
+        geom_vline(
+          xintercept = mean(data2$B5C_m),
+          linetype = "dashed",
+          color = "gray",
+          size = 1
+        )+  theme_bw()+
+        theme(panel.grid = element_blank(),
+              axis.title.y = element_blank(),
+              plot.title = element_text(hjust = 0.5), 
+              axis.text.x = element_text(size = 10, face = "bold"),
+              axis.text.y = element_text(size = 10, face = "bold"),
+              legend.position = "none"
+              )+ labs(x="", y="")
+
+```
+
+```{r fig.height=3.5, include=FALSE}
+#Gender
+Gender<-plot_model(m1_optimal, 
+             type = "pred", 
+             terms = "gen",
+             dot.size = 6,
+             line.size = 2,
+             title = "Gender") +  theme_bw()+
+    aes(color = c("1", "2")) +
+    scale_color_manual( values = c( "gray","red")) +
+      theme(panel.grid = element_blank(),
+        plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(size = 10, face = "bold"),
+        axis.text.y = element_text(size = 10, face = "bold"),
+        legend.position = "none"
+        )+ labs(x="", y="")
+```
+
+```{r fig.height=3.5, include=FALSE}
+#Day Type
+Day_Type <-plot_model(m1_optimal, 
+             type = "pred", 
+             terms = "day",
+             dot.size = 6,
+             line.size = 2,
+             title = "Day Type") +  theme_bw()+
+    aes(color = c("1", "2")) +
+    scale_color_manual( values = c( "gray","deepskyblue3")) +
+      theme(panel.grid = element_blank(),
+        plot.title = element_text(hjust = 0.5), 
+        axis.text.x = element_text(size = 10, face = "bold"),
+        axis.text.y = element_text(size = 10, face = "bold"),
+        legend.position = "none"
+        )+ labs(x="", y="")
+```
+
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.width=8, fig.height=10,}
+reS_opt <- ggarrange(Speed, Trip_Period, Trait_Anxiety, B5C, Gender, Day_Type, ncol = 2, nrow = 3)
+
+reS_l_opt = cowplot::plot_grid(reS_opt, mylegend, nrow = 2, rel_heights = c(.9,.1))
+reS_l_opt
+```
+
+### sjPlot for predictor variables
+
+```{r echo=FALSE, fig.align='center', fig.height=4, message=FALSE, warning=FALSE}
+sjPlot::plot_model(m1_optimal,
+                   show.values=TRUE, show.p=TRUE,
+                   title="Optimal Model Plot - Predictor Variables") + 
+  theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+          axis.text = element_text(size = 10)
+       ) 
+```
+***Observations based on the Optimal model - sjPlot***
+
+By seeing the above Optimal Model sjPlot, we can make the following observations:
+
+    -> Speed has a positive effect on heart rate (estimate = 0.11)
+    -> Trip Period - Morning has a negative effect on heart rate (estimate = -4.48).
+    -> Trait Anxiety has a positive effect on heart rate (estimate = 0.47).
+    -> Conscientiousness has a positive effect on heart rate (estimate = 2.42).
+    -> Gender Male has a positive effect on heart rate (estimate = 9.93).
+    -> Day Weekend has a negative effect on heart rate (estimate = -2.79).
+
+Overall, these results suggest that these predictor variables, including speed, trait anxiety, conscientiousness, gender:male, and day:weekend, have a significant impact on heart rate. 
+
+### Optimal model Random effects plot
+
+```{r echo=FALSE, message=FALSE, warning=FALSE, fig.align='center', fig.height=6}
+plot_model(m1_optimal, type = "re", title = "Random Effects Plot", show.values = T)+
+   theme(plot.title = element_text(hjust = 0.5, size = 14, face = "bold"),
+          axis.text = element_text(size = 6)
+       ) 
+```
+***Conclusion***
+
+We can infer that these variables are related to an increase or decrease in heart rate while driving based on the multiple linear regression model that uses driving heart rate as the response variable and Speed, Trait_Anxiety, Conscientiousness, DayType_weekend, Trip_period_Morning, and Gender as significant predictor variables. 
+
+
+According to the model, driving on a weekend, being a man, starting your trip in the morning, and driving faster speeds are all linked to elevated heart rates. On the other side, a reduction in heart rate when driving is linked to greater levels of trait anxiety and conscientiousness.
